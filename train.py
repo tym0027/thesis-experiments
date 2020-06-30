@@ -449,8 +449,6 @@ def test():
             data = data.repeat(1, 3, 1, 1)
         
         data, target = Variable(data, volatile=True), Variable(target)
-        # output, _, _ = model.forward(data, 0.0, 0.0, 0.0)
-        # output, _, _ = model(data)
 
         if args.icl:
             ic_net.eval()
@@ -458,6 +456,7 @@ def test():
 
         # print(data.shape)
         # print(target.shape)
+        '''
         output = ''
         if args.arch == "llllenet":
             output, _, _ = model(data)
@@ -467,10 +466,12 @@ def test():
             output = model.forward(data)
 
         # print(output.shape)
+        '''
 
+        output = model.forward(data)
         criterion = nn.CrossEntropyLoss()
-        test_loss = criterion(output, target)
-        # test_loss += F.cross_entropy(output, target, size_average=False).data[0] # sum up batch loss
+        # test_loss = criterion(output, target)
+        test_loss += F.cross_entropy(output, target, size_average=False).item() # .data[0].item() # sum up batch loss
         pred = output.data.max(1, keepdim=True)[1] # get the index of the max log-probability
         correct += pred.eq(target.data.view_as(pred)).cpu().sum()
 

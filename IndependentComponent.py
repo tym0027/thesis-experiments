@@ -20,7 +20,7 @@ class IndependentComponentLayer(nn.Module):
     def __init__(self, ic_type, H, W, dimensions='2D'):
         super(IndependentComponentLayer, self).__init__()
         self.p_value = -1;
-        self.max_p = .8;
+        self.max_p = 1 # formally .8;
         self.a = 1
         self.b = 0
 
@@ -35,7 +35,6 @@ class IndependentComponentLayer(nn.Module):
         return self.p_value
 
     def set_a_and_b(self, correct, incorrect):
-        # self.p_value = self.max_p * np.random.beta(correct, incorrect);
         self.a = float(incorrect) / 1000.0
         self.b = float(correct) / 1000.0
         print("a set to: ", self.a, " & b set to: ", self.b)
