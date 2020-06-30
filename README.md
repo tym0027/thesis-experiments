@@ -1,4 +1,4 @@
-### Authorship
+# 1. Authorship
 Experiments ran by T. A. Rupprecht March - August 2020
 
 Models developed by github user kuangliu
@@ -8,13 +8,13 @@ Independent Component Layers conceptualized by the authors of
 
 Independent Component Layers implemented by T. A. Rupprecht May 2020
 
-### Script calls
+# 2. Script calls
 ## Training 
-# without Independent Compnent Layers
+### without Independent Compnent Layers
 python ./train.py --arch=resnet --depth=50 --save=./logs/ --dataset=cifar10 --save_name=resnet-test --lr=0.001 --epochs=1000 --cuda_num=6
 
-# with static Independent Compnent Layers
+### with static Independent Compnent Layers
 python ./train.py --arch=resnet --depth=50 --save=./logs/ --dataset=cifar10 --save_name=resnet-test --lr=0.001 --epochs=1000 --cuda_num=6 --icl
 
-# with dynamic Independent Component Layers
+### with dynamic Independent Component Layers
 python ./train.py --arch=resnet --depth=50 --save=./logs/ --dataset=cifar10 --save_name=resnet-test --lr=0.001 --epochs=1000 --cuda_num=6 --icl --dynamic
