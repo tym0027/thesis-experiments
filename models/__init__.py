@@ -17,3 +17,6 @@ from .efficientnet import *
 from .regnet import *
 from .timnet import *
 from .ictimnet import *
+from .icvgg import *
+from .icresnet import *
+from .IndependentComponent import *

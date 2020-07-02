@@ -20,7 +20,7 @@ import random
 import time
 from datetime import datetime
 
-from IndependentComponent import * # IndependentComponentLayer
+from models.IndependentComponent import * # IndependentComponentLayer
 
 from utils import *
 
@@ -149,7 +149,7 @@ transform_train = transforms.Compose([
     # transforms.Resize((32,32)),
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
 ])
 
 '''
@@ -165,7 +165,7 @@ transforms.Compose([
 transform_test = transforms.Compose([
     transforms.Resize((32,32)),
     transforms.ToTensor(),
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
 ])
 
 '''
@@ -214,7 +214,7 @@ elif args.dataset == "cifar100":
     classes = range(0, 100)
 
 if args.cuda:
-    if args.arch == "vgg":
+    if args.arch == "vgg" and not args.icl:
         if args.depth == 16:
             # model = VGG(depth=16, init_weights=True, cfg=None)
             model = VGG('VGG16', len(classes))
@@ -223,10 +223,19 @@ if args.cuda:
             model = VGG('VGG19', num_classes=len(classes))
         else:
             sys.exit("vgg doesn't have those depth!")
+    elif args.arch == "vgg" and args.icl:
+        if args.depth == 16:
+            # model = VGG(depth=16, init_weights=True, cfg=None)
+            model = ICVGG('VGG16', len(classes))
+        elif args.depth == 19:
+            # model = VGG(depth=19, init_weights=True, cfg=None)
+            model = ICVGG('VGG19', num_classes=len(classes))
+        else:
+            sys.exit("vgg doesn't have those depth!")
     elif args.arch == "lenet":
             # model = ICLeNet()
             model = LeNet()
-    elif args.arch == "resnet":
+    elif args.arch == "resnet" and not args.icl:
         if args.depth == 18:
             model = ResNet18()
         elif args.depth == 50:
@@ -234,6 +243,16 @@ if args.cuda:
             model = ResNet50(len(classes))
         else:
             sys.exit("resnet doesn't implement those depth!")
+    elif args.arch == "resnet" and args.icl:
+        if args.depth == 18:
+            model = ICResNet18()
+        elif args.depth == 50:
+            # model = ResNet50()
+            model = ICResNet50(len(classes))
+        else:
+            sys.exit("resnet doesn't implement those depth!")
+
+
     # elif args.arch == "convnet":
     #     args.depth = 4
     #     model = ConvNet()
@@ -242,9 +261,10 @@ if args.cuda:
     model.cuda(args.cuda_num)
 
 ic_net = ''
+'''
 if args.icl:
     ic_net = IndependentComponentLayer("STATIC-BATCH", 32, 32).cuda(args.cuda_num)
-
+'''
 
 # print("P value is:", ic_net.get_p())
 # ic_net.set_p(50,10)
@@ -343,9 +363,12 @@ def train(trainloader,criterion, optimizer, epoch):
         input = input.cuda(args.cuda_num, non_blocking=True)
         target = target.cuda(args.cuda_num, non_blocking=True)
 
+        '''
         if args.icl:
             ic_net.train()
             input = ic_net.forward(input)
+
+        '''
 
         if args.mixup:
             input, target_a, target_b, lam = mixup_data(input, target, args.alpha)
@@ -450,10 +473,11 @@ def test():
         
         data, target = Variable(data, volatile=True), Variable(target)
 
+        '''
         if args.icl:
             ic_net.eval()
             data = ic_net.forward(data)
-
+        '''
         # print(data.shape)
         # print(target.shape)
         '''
@@ -570,7 +594,7 @@ def main():
                         'state_dict': model.state_dict(),
                         'optimizer' : optimizer.state_dict(),
                         'scheduler' : scheduler.state_dict(),
-                        'icl'       : ic_net.state_dict(),
+                        # 'icl'       : ic_net.state_dict(),
                         }, filename="./logs/" + args.save_name + "/" + args.arch+ "-" + str(int(prec1)) + "-" + str(epoch)+'.pth')
             else:
                 save_checkpoint({'epoch': epoch + 1,
