@@ -48,7 +48,7 @@ class Bottleneck(nn.Module):
 
     def __init__(self, in_planes, planes, stride=1):
         super(Bottleneck, self).__init__()
-        
+        print(in_planes, planes, self.expansion*planes) 
         self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
         # self.bn1 = nn.BatchNorm2d(planes)
         self.ic1 = IndependentComponentLayer("STATIC-BATCH", 32, 32, in_channels=planes)
@@ -59,38 +59,23 @@ class Bottleneck(nn.Module):
         # self.bn3 = nn.BatchNorm2d(self.expansion*planes)
         self.ic3 = IndependentComponentLayer("STATIC-BATCH", 32, 32, in_channels=self.expansion*planes)
 
-        self.shortcut1 = nn.Sequential()
-        if stride != 1 or in_planes != self.expansion*planes:
-            self.shortcut = nn.Sequential(
+        # self.shortcut1 = nn.Sequential()
+        self.shortcut1 = nn.Sequential(
                 nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=False),
                 # nn.BatchNorm2d(self.expansion*planes)
                 IndependentComponentLayer("STATIC-BATCH", 32, 32, in_channels=self.expansion*planes)    
             )
-
-        self.shortcut2 = nn.Sequential()
-        if stride != 1 and in_planes == self.expansion*planes:
-            self.shortcut = nn.Sequential(
-                nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=False),
-                # nn.BatchNorm2d(self.expansion*planes)
-                IndependentComponentLayer("STATIC-BATCH", 32, 32, in_channels=self.expansion*planes)
-            )
-
-        self.shortcut3 = nn.Sequential()
-        if stride != 1 and in_planes == self.expansion*planes:
-            self.shortcut = nn.Sequential(
-                nn.Conv2d(in_planes, self.expansion*planes, kernel_size=1, stride=stride, bias=False),
-                # nn.BatchNorm2d(self.expansion*planes)
-                IndependentComponentLayer("STATIC-BATCH", 32, 32, in_channels=self.expansion*planes)
-            )
-
+    
     def forward(self, x):
+        # print("X: ", x.shape)
         # out = F.relu(self.bn1(self.conv1(x)))
         out = F.relu(self.ic1(self.conv1(x)))
         # out = F.relu(self.bn2(self.conv2(out)))
         out = F.relu(self.ic2(self.conv2(out)))
         # out = self.bn3(self.conv3(out))
         out = self.ic3(self.conv3(out))
-        out += self.shortcut(x)
+        # print("out: ", out.shape)
+        out += self.shortcut1(x)
         out = F.relu(out)
         return out
 
