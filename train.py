@@ -95,6 +95,7 @@ parser.add_argument('--save_name', default="test", type=str, help="input a name 
 parser.add_argument('--resume', action='store_true', default=False, help='if resuming training')
 parser.add_argument('--resume_path', default="", type=str, help='path to resume from...')
 parser.add_argument('--icl',  action='store_true', default=False, help='if you want to use an ICL...')
+parser.add_argument('--icl_aug',  action='store_true', default=False, help='if you want to use an ICL as a data augmenter...')
 parser.add_argument('--dynamic',  action='store_true', default=False, help='if you want to use a dynamic ICL...')
 parser.add_argument('--icl_type', type=str, default='BN', help='if you want to use an ICL type other than BN...')
 
@@ -261,10 +262,9 @@ if args.cuda:
     model.cuda(args.cuda_num)
 
 ic_net = ''
-'''
-if args.icl:
+
+if args.icl_aug:
     ic_net = IndependentComponentLayer("STATIC-BATCH", 32, 32).cuda(args.cuda_num)
-'''
 
 # print("P value is:", ic_net.get_p())
 # ic_net.set_p(50,10)
@@ -363,12 +363,9 @@ def train(trainloader,criterion, optimizer, epoch):
         input = input.cuda(args.cuda_num, non_blocking=True)
         target = target.cuda(args.cuda_num, non_blocking=True)
 
-        '''
-        if args.icl:
+        if args.icl_aug:
             ic_net.train()
             input = ic_net.forward(input)
-
-        '''
 
         if args.mixup:
             input, target_a, target_b, lam = mixup_data(input, target, args.alpha)
@@ -452,12 +449,14 @@ def train(trainloader,criterion, optimizer, epoch):
             print(s)
 
         # UPDATE DYNAMIC P VALUES
+        ''' not tetsing dynamics yet...
         if args.icl and args.dynamic and epoch > 0:
             # print("\n\nP value was:", ic_net.get_p())
             ic_net.update_p()
             s = "\tP value is: " + str(ic_net.get_p())
             print(s)
             log(s, True)
+        '''
 
 
 def test():
@@ -473,11 +472,10 @@ def test():
         
         data, target = Variable(data, volatile=True), Variable(target)
 
-        '''
-        if args.icl:
+        if args.icl_aug:
             ic_net.eval()
             data = ic_net.forward(data)
-        '''
+        
         # print(data.shape)
         # print(target.shape)
         '''
@@ -589,12 +587,12 @@ def main():
             print(s)
             # print("\n>_ Got better accuracy, saving model with accuracy {:.3f}% now...\n".format(prec1))
             # torch.save(model.state_dict(), "./logs/" + args.save_name + "/{}_{}{}_acc_{:.3f}_{}_{}_tem_{}_epoch{}.pt".format(args.dataset, args.arch, args.depth, prec1, args.optmzr, args.teacharch, args.temperature, epoch))
-            if args.icl:
+            if args.icl_aug:
                 save_checkpoint({'epoch': epoch + 1,
                         'state_dict': model.state_dict(),
                         'optimizer' : optimizer.state_dict(),
                         'scheduler' : scheduler.state_dict(),
-                        # 'icl'       : ic_net.state_dict(),
+                        'icl'       : ic_net.state_dict(),
                         }, filename="./logs/" + args.save_name + "/" + args.arch+ "-" + str(int(prec1)) + "-" + str(epoch)+'.pth')
             else:
                 save_checkpoint({'epoch': epoch + 1,
