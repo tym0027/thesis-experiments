@@ -102,6 +102,9 @@ parser.add_argument('--icl_type', type=str, default='BN', help='if you want to u
 parser.add_argument('--cuda_num', type=int, default=0, help='Set which gpu to use...')
 parser.add_argument('--test_only', action='store_true', default=False, help='Only test the model...')
 
+parser.add_argument('--feature_extract', action='store_true', default=False, help='Freeze everyting but final layer for feature extraction...')
+parser.add_argument('--transfer_learn', action='store_true', default=False, help='When loading a pretrained model to be trained on a new dataset...')
+
 args = parser.parse_args()
 # if args.distill == "False":
 #     args.distill = False
@@ -336,6 +339,16 @@ if args.warmup:
     scheduler = GradualWarmupScheduler(optimizer, multiplier=args.lr/args.warmup_lr, total_iter=args.warmup_epochs*len(trainloader), after_scheduler=scheduler)
 
 
+if args.feature_extract:
+    for name, param in model.named_parameters():
+    # for param in model.parameters():
+        if args.arch == "resnet" and "linear" not in name:
+            param.requires_grad = False
+        elif args.arch == "vgg" and "classifier" not in name:
+            param.requires_grad = False
+        else:
+            print("Freezing everything except: ", name)
+
 #############
 
 def train(trainloader,criterion, optimizer, epoch):
@@ -436,16 +449,6 @@ def train(trainloader,criterion, optimizer, epoch):
             s = 'Epoch: [{0}][{1}/{2}]\tTime {batch_time.val:.3f} ({batch_time.avg:.3f})\tData {data_time.val:.3f} ({data_time.avg:.3f})\tLoss {loss.val:.4f} ({loss.avg:.4f})\tAcc@1 {top1.val:.3f} ({top1.avg:.3f}) Acc@5 {top5.val:.3f} ({top5.avg:.3f})\t'.format(epoch, i, len(trainloader), batch_time=batch_time, data_time=data_time, loss=losses, top1=top1, top5=top5)
 
             log(s, True)
-            '''
-            print('Epoch: [{0}][{1}/{2}]\t'
-                  'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                  'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                  'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                  'Acc@1 {top1.val:.3f} ({top1.avg:.3f})\t'
-                  .format(
-                   epoch, i, len(trainloader), batch_time=batch_time,
-                   data_time=data_time, loss=losses, top1=top1))
-            '''
             print(s)
 
         # UPDATE DYNAMIC P VALUES
@@ -606,23 +609,53 @@ def main():
             print(s)
             log(s, True)
             # print("\n>_ Deleting previous model file with accuracy {:.3f}% now...\n".format(max(all_acc)))
-            if len(all_acc) > 1:
-                os.remove("./logs/" + args.save_name +  "/" + args.arch + "-" + str(int(prev_prec1)) + "-" + str(last_saved_epoch)+'.pth')
+            # if len(all_acc) > 1:
+            #     os.remove("./logs/" + args.save_name +  "/" + args.arch + "-" + str(int(prev_prec1)) + "-" + str(last_saved_epoch)+'.pth')
             last_saved_epoch = epoch
             prev_prec1 = prec1
 
             # UPDATE A & B FOR BETA DIST.
             if args.icl and args.dynamic:
                 print("\nupdating a and b for beta distribution...")
-                ic_net.set_a_and_b(correct, total - correct)
+                for name, param in model.named_parameters():
+                    arr = name.split(".")
+                                       
+                    if args.arch == "resnet" and "ic" in name and "ic" not in arr[0]:
+                        print(arr, param.size())
+                        eval("model.{}[{}].{}".format(arr[0],arr[1],arr[2])).set_a_and_b(correct, total - correct)
+                    elif args.arch == "resnet" and "ic" in name and "ic" in arr[0]:
+                        print(arr, param.size())
+                        eval("model.{}".format(arr[0])).set_a_and_b(correct, total - correct)
+                    if args.arch == "vgg" and arr[1] in ['0', '3', '7', '10', '14', '17', '20', '23', '27', '30', '33', '36', '40', '43', '46', '49']:
+                        print(arr, param.size())
+                        eval("model.features[{}]".format(arr[1])).set_a_and_b(correct, total - correct)
+                    else:
+                        print("nope: ", arr)
 
         # UPDATE DYNAMIC P VALUES
         if args.icl and args.dynamic:
-            print("\n\nP value was:", ic_net.get_p())
-            ic_net.update_p()
-            s = "\nP value is: " + str(ic_net.get_p())
-            print(s)
-            log(s, True)
+            for name, param in model.named_parameters():
+                arr = name.split(".")
+
+                if args.arch == "resnet" and "ic" in name and "ic" not in arr[0]:
+                    print(arr, param.size())
+                    # eval("model.{}[{}].{}".format(arr[0],arr[1],arr[2])).get_p()
+
+                    print("\n\nP value was:", eval("model.{}[{}].{}".format(arr[0],arr[1],arr[2])).get_p())
+                    eval("model.{}[{}].{}".format(arr[0],arr[1],arr[2])).update_p()
+                    s = "\nP value is: " + str(eval("model.{}[{}].{}".format(arr[0],arr[1],arr[2])).get_p())
+                elif args.arch == "resnet" and "ic" in name and "ic" in arr[0]:
+                    print("\n\nP value was:", eval("model.{}".format(arr[0])).get_p())
+                    eval("model.{}".format(arr[0])).update_p()
+                    s = "\nP value is: " + str(eval("model.{}".format(arr[0])).get_p())
+                elif args.arch == "vgg" and arr[1] in ['0', '3', '7', '10', '14', '17', '20', '23', '27', '30', '33', '36', '40', '43', '46', '49']:
+                    print("\n\nP value was:", eval("model.features[{}]".format(arr[1])).get_p())
+                    eval("model.features[{}]".format(arr[1])).update_p()
+                    s = "\nP value is: " + str(eval("model.features[{}]".format(arr[1])).get_p())
+                else:
+                    continue
+                print(s)
+                log(s, True)
 
 
 
