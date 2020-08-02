@@ -104,6 +104,8 @@ parser.add_argument('--test_only', action='store_true', default=False, help='Onl
 
 parser.add_argument('--feature_extract', action='store_true', default=False, help='Freeze everyting but final layer for feature extraction...')
 parser.add_argument('--transfer_learn', action='store_true', default=False, help='When loading a pretrained model to be trained on a new dataset...')
+parser.add_argument('--pretrain_model', type=str, default='', help='Where to load a pretrained model from...')
+
 
 args = parser.parse_args()
 # if args.distill == "False":
@@ -313,12 +315,9 @@ optimizer_init_lr = args.warmup_lr if args.warmup else args.lr
 optimizer = None
 if(args.optmzr == 'sgd'):
     optimizer = torch.optim.SGD(model.parameters(), optimizer_init_lr,momentum=0.9, weight_decay=1e-4)
-    print("hello")
 elif(args.optmzr =='adam'):
     optimizer = torch.optim.Adam(model.parameters(), optimizer_init_lr)
-    print("hello")
 
-print("goodbye")
 
 
 scheduler = None
@@ -338,6 +337,9 @@ else:
 if args.warmup:
     scheduler = GradualWarmupScheduler(optimizer, multiplier=args.lr/args.warmup_lr, total_iter=args.warmup_epochs*len(trainloader), after_scheduler=scheduler)
 
+
+if args.pretrain_model != '':
+    model, optimizer, scheduler, start_epoch = load_checkpoint(args.pretrain_model, model, ic_net, optimizer)
 
 if args.feature_extract:
     for name, param in model.named_parameters():
@@ -621,16 +623,16 @@ def main():
                     arr = name.split(".")
                                        
                     if args.arch == "resnet" and "ic" in name and "ic" not in arr[0]:
-                        print(arr, param.size())
+                        # print(arr, param.size())
                         eval("model.{}[{}].{}".format(arr[0],arr[1],arr[2])).set_a_and_b(correct, total - correct)
                     elif args.arch == "resnet" and "ic" in name and "ic" in arr[0]:
-                        print(arr, param.size())
+                        # print(arr, param.size())
                         eval("model.{}".format(arr[0])).set_a_and_b(correct, total - correct)
                     if args.arch == "vgg" and arr[1] in ['0', '3', '7', '10', '14', '17', '20', '23', '27', '30', '33', '36', '40', '43', '46', '49']:
-                        print(arr, param.size())
+                        # print(arr, param.size())
                         eval("model.features[{}]".format(arr[1])).set_a_and_b(correct, total - correct)
                     else:
-                        print("nope: ", arr)
+                        pass # print("nope: ", arr)
 
         # UPDATE DYNAMIC P VALUES
         if args.icl and args.dynamic:
@@ -638,22 +640,22 @@ def main():
                 arr = name.split(".")
 
                 if args.arch == "resnet" and "ic" in name and "ic" not in arr[0]:
-                    print(arr, param.size())
+                    # print(arr, param.size())
                     # eval("model.{}[{}].{}".format(arr[0],arr[1],arr[2])).get_p()
 
-                    print("\n\nP value was:", eval("model.{}[{}].{}".format(arr[0],arr[1],arr[2])).get_p())
+                    # print("\n\nP value was:", eval("model.{}[{}].{}".format(arr[0],arr[1],arr[2])).get_p())
                     eval("model.{}[{}].{}".format(arr[0],arr[1],arr[2])).update_p()
                     s = "\nP value is: " + str(eval("model.{}[{}].{}".format(arr[0],arr[1],arr[2])).get_p())
                 elif args.arch == "resnet" and "ic" in name and "ic" in arr[0]:
-                    print("\n\nP value was:", eval("model.{}".format(arr[0])).get_p())
+                    # print("\n\nP value was:", eval("model.{}".format(arr[0])).get_p())
                     eval("model.{}".format(arr[0])).update_p()
                     s = "\nP value is: " + str(eval("model.{}".format(arr[0])).get_p())
                 elif args.arch == "vgg" and arr[1] in ['0', '3', '7', '10', '14', '17', '20', '23', '27', '30', '33', '36', '40', '43', '46', '49']:
-                    print("\n\nP value was:", eval("model.features[{}]".format(arr[1])).get_p())
+                    # print("\n\nP value was:", eval("model.features[{}]".format(arr[1])).get_p())
                     eval("model.features[{}]".format(arr[1])).update_p()
                     s = "\nP value is: " + str(eval("model.features[{}]".format(arr[1])).get_p())
                 else:
-                    continue
+                    pass # continue
                 print(s)
                 log(s, True)
 
