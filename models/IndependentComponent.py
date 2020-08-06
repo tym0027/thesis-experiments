@@ -20,15 +20,17 @@ class IndependentComponentLayer(nn.Module):
     def __init__(self, ic_type, H, W, in_channels=3, dimensions='2D'):
         super(IndependentComponentLayer, self).__init__()
         self.p_value = -1;
-        self.max_p = 1 # formally .8;
+        self.max_p = .2  # 1 # formally .8;
         self.a = 1
         self.b = 0
 
         self.features = self._make_icl(cfg[ic_type], H, W, in_channels, dimensions)
-        print("p value set to: ", self.p_value)
+        # print("p value set to: ", self.p_value)
 
     def update_p(self):
+        _former = self.p_value
         self.p_value = self.max_p * np.random.beta(self.a, self.b);
+        print("p value set to: ", self.p_value, " (from ", _former,")")
         return
 
     def get_p(self):
@@ -42,6 +44,7 @@ class IndependentComponentLayer(nn.Module):
     
     def forward(self, x):
         out = self.features(x)
+        out = F.dropout(out, p=self.p_value, training=self.training)
         return out
 
     def _make_icl(self, cfg, H, W, in_channels, dimensions):
@@ -77,7 +80,7 @@ class IndependentComponentLayer(nn.Module):
         elif cfg[1] == 'r':
             self.p_value = 0;
 
-        layers.append(nn.Dropout(self.p_value))
+        # layers.append(nn.Dropout(self.p_value))
 
         return nn.Sequential(*layers)
 

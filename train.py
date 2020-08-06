@@ -235,7 +235,10 @@ if args.cuda:
             model = ICVGG('VGG16', len(classes))
         elif args.depth == 19:
             # model = VGG(depth=19, init_weights=True, cfg=None)
-            model = ICVGG('VGG19', num_classes=len(classes))
+            if args.transfer_learn:
+                model = ICVGG('VGG19', num_classes=10)    
+            else:
+                model = ICVGG('VGG19', num_classes=len(classes))
         else:
             sys.exit("vgg doesn't have those depth!")
     elif args.arch == "lenet":
@@ -337,7 +340,7 @@ else:
 if args.warmup:
     scheduler = GradualWarmupScheduler(optimizer, multiplier=args.lr/args.warmup_lr, total_iter=args.warmup_epochs*len(trainloader), after_scheduler=scheduler)
 
-
+'''
 if args.pretrain_model != '':
     model, optimizer, scheduler, start_epoch = load_checkpoint(args.pretrain_model, model, ic_net, optimizer)
 
@@ -350,7 +353,7 @@ if args.feature_extract:
             param.requires_grad = False
         else:
             print("Freezing everything except: ", name)
-
+'''
 #############
 
 def train(trainloader,criterion, optimizer, epoch):
@@ -515,50 +518,58 @@ def test():
     '''
     return (float(100 * correct) / float(len(testloader.dataset))), correct, float(len(testloader.dataset))
 
-
-def load_checkpoint(path, model, ic_net, optimizer):
-    loadedcheckpoint = torch.load(path)
-
-    try:
-        model.load_state_dict(loadedcheckpoint['state_dict'])
-    except:
-        print("no state dict!!!")
-
-    try:
-        start_epoch = loadedcheckpoint['epoch']
-    except:
-        print("no epoch!!!")
-
-    try:
-        optimizer.load_state_dict(loadedcheckpoint['optimizer'])
-    except:
-        print("no optimizer!!!")
-    try:
-        scheduler.load_state_dict(loadedcheckpoint['scheduler'])
-    except:
-        print("No scheduler!!!")
-    try:
-        ic_net.load_state_dict(loadedcheckpoint['icl'])
-    except:
-        print("No IC net!!!")
-    return model, optimizer, scheduler, start_epoch
-
-
 def save_checkpoint(state, filename='checkpoint.pth'):
     torch.save(state, filename)
+
+def set_bn_eval(module):
+    if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
+        print("gotcha...")
+        module.eval()
+    else:
+        print("failure to find")
 
 
 def main():
     global optimizer, model, criterion, scheduler
     all_acc = [0.000]
     start_epoch = 0
+    
+    
+    if args.pretrain_model != '':
+        # model, optimizer, scheduler, start_epoch = load_checkpoint(args.pretrain_model, model, ic_net, optimizer)
+        # model = load_checkpoint(args.pretrain_model, model)
+        loadedcheckpoint = torch.load(args.pretrain_model)
+        for entry in model.state_dict().keys():
+            print(entry, model.state_dict()[entry].shape)
+            if entry not in loadedcheckpoint['state_dict'].keys():
+                print("\tnot in checkpoint...")
+            elif model.state_dict()[entry].shape == loadedcheckpoint['state_dict'][entry].shape:
+                print("\tcopying...")
+                model.state_dict()[entry].copy_(loadedcheckpoint['state_dict'][entry].data)
+            else:
+                print("\tin checkpiont!", loadedcheckpoint['state_dict'][entry].shape)
+            
+        # model.apply(set_bn_eval)
+
+    if args.feature_extract:
+        model.apply(set_bn_eval)
+        for name, param in model.named_parameters():
+            # for param in model.parameters():
+            if args.arch == "resnet" and "linear" not in name:
+                param.requires_grad = False
+            elif args.arch == "vgg" and "classifier" not in name:
+                param.requires_grad = False
+            else:
+                print("Freezing everything except: ", name)
 
     if args.resume:
         # Load checkpoint.
         print('resuming from checkpoint... ' + str(args.resume_path))
         log('resuming from checkpoint... ' + str(args.resume_path))
         assert os.path.isdir('logs/' + args.save_name), 'Error: no checkpoint directory found!'
-        model, optimizer, scheduler, start_epoch = load_checkpoint(args.resume_path, model, ic_net, optimizer)
+        # model, optimizer, scheduler, start_epoch = load_checkpoint(args.resume_path, model, ic_net, optimizer)
+        model, optimizer, start_epoch = load_checkpoint(args.resume_path, model, ic_net, optimizer)
+
    
     if args.test_only:
         prec1, correct, total = test()
@@ -581,7 +592,7 @@ def main():
             all_acc = [prec1]
 
             if args.icl and args.dynamic:
-                ic_net.set_a_and_b(correct, total - correct)
+                model.update_ic_layers_ab(correct, total - correct)
         
         train(trainloader,criterion, optimizer, epoch)
         prec1, correct, total = test()
@@ -619,46 +630,11 @@ def main():
             # UPDATE A & B FOR BETA DIST.
             if args.icl and args.dynamic:
                 print("\nupdating a and b for beta distribution...")
-                for name, param in model.named_parameters():
-                    arr = name.split(".")
-                                       
-                    if args.arch == "resnet" and "ic" in name and "ic" not in arr[0]:
-                        # print(arr, param.size())
-                        eval("model.{}[{}].{}".format(arr[0],arr[1],arr[2])).set_a_and_b(correct, total - correct)
-                    elif args.arch == "resnet" and "ic" in name and "ic" in arr[0]:
-                        # print(arr, param.size())
-                        eval("model.{}".format(arr[0])).set_a_and_b(correct, total - correct)
-                    if args.arch == "vgg" and arr[1] in ['0', '3', '7', '10', '14', '17', '20', '23', '27', '30', '33', '36', '40', '43', '46', '49']:
-                        # print(arr, param.size())
-                        eval("model.features[{}]".format(arr[1])).set_a_and_b(correct, total - correct)
-                    else:
-                        pass # print("nope: ", arr)
+                model.update_ic_layers_ab(correct, total - correct)
 
         # UPDATE DYNAMIC P VALUES
         if args.icl and args.dynamic:
-            for name, param in model.named_parameters():
-                arr = name.split(".")
-
-                if args.arch == "resnet" and "ic" in name and "ic" not in arr[0]:
-                    # print(arr, param.size())
-                    # eval("model.{}[{}].{}".format(arr[0],arr[1],arr[2])).get_p()
-
-                    # print("\n\nP value was:", eval("model.{}[{}].{}".format(arr[0],arr[1],arr[2])).get_p())
-                    eval("model.{}[{}].{}".format(arr[0],arr[1],arr[2])).update_p()
-                    s = "\nP value is: " + str(eval("model.{}[{}].{}".format(arr[0],arr[1],arr[2])).get_p())
-                elif args.arch == "resnet" and "ic" in name and "ic" in arr[0]:
-                    # print("\n\nP value was:", eval("model.{}".format(arr[0])).get_p())
-                    eval("model.{}".format(arr[0])).update_p()
-                    s = "\nP value is: " + str(eval("model.{}".format(arr[0])).get_p())
-                elif args.arch == "vgg" and arr[1] in ['0', '3', '7', '10', '14', '17', '20', '23', '27', '30', '33', '36', '40', '43', '46', '49']:
-                    # print("\n\nP value was:", eval("model.features[{}]".format(arr[1])).get_p())
-                    eval("model.features[{}]".format(arr[1])).update_p()
-                    s = "\nP value is: " + str(eval("model.features[{}]".format(arr[1])).get_p())
-                else:
-                    pass # continue
-                print(s)
-                log(s, True)
-
+            model.update_ic_layers_p()
 
 
         all_acc.append(prec1)

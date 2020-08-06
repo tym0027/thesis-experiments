@@ -41,6 +41,16 @@ class ICVGG(nn.Module):
         layers += [nn.AvgPool2d(kernel_size=1, stride=1)]
         return nn.Sequential(*layers)
 
+    # '0', '3', '7', '10', '14', '17', '20', '23', '27', '30', '33', '36', '40', '43', '46', '49']:
+    def update_ic_layers_p(self):
+        for i in [0, 3, 7, 10, 14, 17, 20, 23, 27, 30, 33, 36, 40, 43, 46, 49]:
+            self.features[i].update_p()
+        
+
+    def update_ic_layers_ab(self, correct, incorrect):
+        for i in [0, 3, 7, 10, 14, 17, 20, 23, 27, 30, 33, 36, 40, 43, 46, 49]:
+            self.features[i].set_a_and_b(correct, incorrect)
+
 
 def test():
     net = ICVGG('VGG11')

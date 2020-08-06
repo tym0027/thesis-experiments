@@ -9,6 +9,38 @@ from torchvision import datasets, transforms
 from torch.autograd import Variable
 import time
 
+# def load_checkpoint(path, model, ic_net, optimizer):
+def load_checkpoint(path, model):
+    loadedcheckpoint = torch.load(path)
+    model.load_state_dict(loadedcheckpoint['state_dict'])
+
+
+    try:
+        model.load_state_dict(loadedcheckpoint['state_dict'])
+    except:
+        print("no state dict!!!")
+    '''
+    try:
+        start_epoch = loadedcheckpoint['epoch']
+    except:
+        print("no epoch!!!")
+
+    try:
+        optimizer.load_state_dict(loadedcheckpoint['optimizer'])
+    except:
+        print("no optimizer!!!")
+    try:
+        scheduler.load_state_dict(loadedcheckpoint['scheduler'])
+    except:
+        print("No scheduler!!!")
+    try:
+        ic_net.load_state_dict(loadedcheckpoint['icl'])
+    except:
+        print("No IC net!!!")
+    '''
+    # return model, optimizer, scheduler, start_epoch
+    return model
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
     def __init__(self):
