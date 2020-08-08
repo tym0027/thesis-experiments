@@ -115,6 +115,7 @@ args = parser.parse_args()
 
 args.cuda = not args.no_cuda and torch.cuda.is_available()
 
+torch.set_num_threads(1)
 
 def log(s, timestamp=True):
     if not os.path.exists('logs/' + args.save_name):

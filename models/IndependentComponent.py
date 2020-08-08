@@ -20,7 +20,7 @@ class IndependentComponentLayer(nn.Module):
     def __init__(self, ic_type, H, W, in_channels=3, dimensions='2D'):
         super(IndependentComponentLayer, self).__init__()
         self.p_value = -1;
-        self.max_p = .2  # 1 # formally .8;
+        self.max_p = .05  # 1 # formally .8;
         self.a = 1
         self.b = 0
 
@@ -55,11 +55,11 @@ class IndependentComponentLayer(nn.Module):
 
         if cfg[0] == 'BN':
             if dimensions == '1D':
-                layers.append(nn.BatchNorm1d(num_features=HW))
+                layers.append(nn.BatchNorm1d(num_features=HW, track_running_stats=True))
             elif dimensions == '2D':
-                layers.append(nn.BatchNorm2d(num_features=in_channels))
+                layers.append(nn.BatchNorm2d(num_features=in_channels, track_running_stats=True))
             elif dimensions == '3D':
-                layers.append(nn.BatchNorm3d(num_features=in_channels))
+                layers.append(nn.BatchNorm3d(num_features=in_channels, track_running_stats=True))
 
         elif cfg[0] == 'GN':
             layers.append(nn.GroupNorm(num_groups,in_channels))
