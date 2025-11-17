@@ -18,3 +18,9 @@ python ./train.py --arch=resnet --depth=50 --save=./logs/ --dataset=cifar10 --sa
 
 ### with dynamic Independent Component Layers
 python ./train.py --arch=resnet --depth=50 --save=./logs/ --dataset=cifar10 --save_name=resnet-test --lr=0.001 --epochs=1000 --cuda_num=6 --icl --dynamic
+
+### For modern implementations on macbook
+python ./train.py --arch=resnet --depth=50 --save=./logs/ --dataset=cifar10 --save_name=resnet-test --lr=0.001 --epochs=1000 --no-cuda --device mps
+
+### For modern implementations on cpu
+python ./train.py --arch=resnet --depth=50 --save=./logs/ --dataset=cifar10 --save_name=resnet-test --lr=0.001 --epochs=1000 --no-cuda --device cpu

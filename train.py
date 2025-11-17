@@ -27,6 +27,8 @@ from utils import *
 
 # Training settings
 parser = argparse.ArgumentParser(description='PyTorch CIFAR training')
+parser.add_argument('--device', type=str, default=None,
+                    help='where to train...')
 parser.add_argument('--arch', type=str, default=None,
                     help='[vgg, resnet, convnet, alexnet]')
 parser.add_argument('--depth', default=None, type=int,
@@ -145,7 +147,7 @@ if args.cuda:
 if not os.path.exists(args.save):
     os.makedirs(args.save)
 
-kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
+kwargs = {'num_workers': 0, 'pin_memory': True} if args.cuda else {}
 
 
 transform_train = transforms.Compose([
@@ -185,20 +187,20 @@ transforms.Compose([
 if args.dataset == "mnist":
     # nlog('==> using MNIST data..', True)
     trainset = torchvision.datasets.MNIST(root='./data', train=True, download=True, transform=transform_train)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, drop_last=False, shuffle=True, num_workers=1)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, drop_last=False, shuffle=True, num_workers=0)
 
     testset = torchvision.datasets.MNIST('./data', train=False, download=True, transform=transform_test)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=100, drop_last=False, shuffle=True, num_workers=1)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=100, drop_last=False, shuffle=True, num_workers=0)
 
     classes = ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
 
 elif args.dataset == "fmnist":
     # log('==> using Fashion MNIST data..', True)
     trainset = torchvision.datasets.FashionMNIST(root='./data', train=True, download=True, transform=transform_train)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, drop_last=True, shuffle=True, num_workers=1)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, drop_last=True, shuffle=True, num_workers=0)
 
     testset = torchvision.datasets.FashionMNIST(root='./data', train=False, download=True, transform=transform_test)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=100, drop_last=True, shuffle=True, num_workers=1)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=100, drop_last=True, shuffle=True, num_workers=0)
 
     classes = ('T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot')
 
@@ -206,10 +208,10 @@ elif args.dataset == "cifar10":
     # log('==> using CIFAR10 data..', True)
 
     trainset = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, drop_last=False, shuffle=True, num_workers=1)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=128, drop_last=False, shuffle=True, num_workers=0)
 
     testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=100, drop_last=False, shuffle=False, num_workers=1)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=100, drop_last=False, shuffle=False, num_workers=0)
 
     classes = ('plane', 'car', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
 elif args.dataset == "cifar100":
@@ -220,7 +222,8 @@ elif args.dataset == "cifar100":
 
     classes = range(0, 100)
 
-if args.cuda:
+# if args.cuda:
+if True:
     if args.arch == "vgg" and not args.icl:
         if args.depth == 16:
             # model = VGG(depth=16, init_weights=True, cfg=None)
@@ -262,14 +265,15 @@ if args.cuda:
         else:
             sys.exit("resnet doesn't implement those depth!")
 
-
+if args.cuda:
     # elif args.arch == "convnet":
     #     args.depth = 4
     #     model = ConvNet()
     if args.multi_gpu:
         model = torch.nn.DataParallel(model)
     model.cuda(args.cuda_num)
-
+else:
+    model.to(args.device)
 ic_net = ''
 
 if args.icl_aug:
@@ -307,7 +311,8 @@ if args.cuda and args.distill:
 
 #############
 
-criterion = CrossEntropyLossMaybeSmooth(smooth_eps=args.smooth_eps).cuda(args.cuda_num)
+# criterion = CrossEntropyLossMaybeSmooth(smooth_eps=args.smooth_eps).cuda(args.cuda_num)
+criterion = CrossEntropyLossMaybeSmooth(smooth_eps=args.smooth_eps).to(args.device)
 # criterion = nn.CrossEntropyLoss()
 
 
@@ -379,8 +384,10 @@ def train(trainloader,criterion, optimizer, epoch):
         # adjust learning rate
         scheduler.step()
 
-        input = input.cuda(args.cuda_num, non_blocking=True)
-        target = target.cuda(args.cuda_num, non_blocking=True)
+        # input = input.cuda(args.cuda_num, non_blocking=True)
+        input = input.to(args.device)
+        # target = target.cuda(args.cuda_num, non_blocking=True)
+        target = target.to(args.device)
 
         if args.icl_aug:
             ic_net.train()
@@ -475,6 +482,8 @@ def test():
     for data, target in testloader:
         if args.cuda:
             data, target = data.cuda(args.cuda_num), target.cuda(args.cuda_num)
+        else:
+            data, target = data.to(args.device), target.to(args.device)
         
         if args.dataset == "mnist" or args.dataset == "fmnist":
             data = data.repeat(1, 3, 1, 1)

@@ -71,9 +71,9 @@ class CrossEntropyLossMaybeSmooth(nn.CrossEntropyLoss):
         if not smooth:
             return F.cross_entropy(output, target)
 
-        target = target.contiguous().view(-1)
+        target = target.contiguous().reshape(-1)
         n_class = output.size(1)
-        one_hot = torch.zeros_like(output).scatter(1, target.view(-1, 1), 1)
+        one_hot = torch.zeros_like(output).scatter(1, target.reshape(-1, 1), 1)
         smooth_one_hot = one_hot * (1 - self.smooth_eps) + (1 - one_hot) * self.smooth_eps / (n_class - 1)
         log_prb = F.log_softmax(output, dim=1)
         loss = -(smooth_one_hot * log_prb).sum(dim=1).mean()
@@ -147,11 +147,11 @@ def accuracy(output, target, topk=(1,)):
 
         _, pred = output.topk(maxk, 1, True, True)
         pred = pred.t()
-        correct = pred.eq(target.view(1, -1).expand_as(pred))
+        correct = pred.eq(target.reshape(1, -1).expand_as(pred))
 
         res = []
         for k in topk:
-            correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
+            correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
             res.append(correct_k.mul_(100.0 / batch_size))
         return res
 
